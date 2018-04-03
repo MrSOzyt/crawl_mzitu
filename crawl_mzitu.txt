@@ -1,0 +1,68 @@
+# ! /user/bin/python
+# coding:utf-8
+import re
+import requests
+from bs4 import BeautifulSoup
+import os
+import time
+
+headers={'User-Agent':'Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/63.0.3239.132 Safari/537.36',
+        'Host':'www.mzitu.com' ,
+         'Accept':'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+         'Connection':'keep-alive',
+         'Referer':'https://www.baidu.com/link?url=125d_n_Km_v37Hc7toRdfIQjI3jcglmuyvnTUziUncC&wd=&eqid=e94944280001dad5000000035abe283d',
+         'Accept-Encoding':'gzip, deflate',
+         'Cache-Control':'max-age=0',
+         'Cookie':'Hm_lvt_dbc355aef238b6c32b43eacbbf161c3c=1522292402,1522372060,1522393968,1522411601; Hm_lpvt_dbc355aef238b6c32b43eacbbf161c3c=1522411601',
+         'Upgrade-Insecure-Requests':'1'}
+def get_piclist(num):#获得图集的地址
+    url='http://www.mzitu.com/page/{}/'.format(num)
+    resp=requests.get(url,headers=headers)
+    soup=BeautifulSoup(resp.text,'html.parser')
+    L=[]
+    piclist=[]
+    for urls in soup.select('li'):
+        urls_image=urls.select('a')[0]['href']
+        L.append(urls_image)
+    pattern=re.compile(r'http://www.mzitu.com/\d+')
+    for url_mz in L:
+        result=pattern.findall(url_mz)
+        if len(result)>0:#去除掉不需要的地址
+            piclist.append(result[0])
+    return piclist
+
+def get_pic_url(piclist):#获取单张图片的地址和图片标题
+    jpglist=[]
+    title=[]
+    for url in piclist:
+        resp1=requests.get(url,headers=headers)
+        soup1=BeautifulSoup(resp1.text,'html.parser')
+        pics=soup1.select('.pagenavi')[0]
+        total=pics.select('span')[-2].text#图集中图片的数量
+        title=soup1.select('.main-title')[0].text#获得了图集的名字
+        for i in range(int(total)):
+            link='{}/{}'.format(url,i+1)
+            resp2=requests.get(link,headers=headers)
+            soup2=BeautifulSoup(resp2.text,'html.parser')
+            jpg_url=jpg=soup2.select('img')[0]['src']
+            jpglist.append(jpg_url)#获得了图集中每张图片的地址
+    return title,jpglist
+
+def download(title,jpglist):
+    k=1
+    count=len(jpglist)#图集中的图片数
+    os.chdir('E:/')
+    dirName=u"【%sP】%s" % (str(count), title)
+    os.mkdir(dirName)
+    for i in jpglist:
+        filename='%s/%s/%s.jpg' % (os.path.abspath('.'), dirName, k)
+        print(u'开始下载图片:%s 第%s张' % (dirName, k))
+        with open(filename,'wb') as jpg:
+            jpg.write(requests.get(i).content)
+            time.sleep(1)
+        k += 1
+
+if __name__ == '__main__':
+    num = input(u'请输入页码：')
+    returnValue=get_pic_url(get_piclist(num))
+    download(returnValue[0],returnValue[1])
